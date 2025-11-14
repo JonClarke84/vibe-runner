@@ -6,6 +6,7 @@ import { Obstacle } from './game/Obstacle.js';
 import { checkCollision } from './game/collision.js';
 import { WebSocketClient } from './network/WebSocketClient.js';
 import { GhostPlayer } from './game/GhostPlayer.js';
+import { ChunkManager } from './game/ChunkManager.js';
 
 // Game constants
 const GAME_WIDTH = 1280;
@@ -26,6 +27,9 @@ let myPlayerId = null; // Our player ID from server
 
 // Ghost players (other connected players)
 let ghostPlayers = new Map(); // Map<playerId, GhostPlayer>
+
+// Chunk Manager (Phase 4)
+let chunkManager = null;
 
 // Debug display
 let debugText;
@@ -52,14 +56,9 @@ function init() {
     ground = new Ground(GAME_WIDTH, GROUND_Y);
     app.stage.addChild(ground.sprite);
 
-    // Create static obstacles
-    obstacles.push(new Obstacle(400, GROUND_Y - 80, 40, 80));
-    obstacles.push(new Obstacle(650, GROUND_Y - 60, 60, 60));
-    obstacles.push(new Obstacle(900, GROUND_Y - 100, 30, 100));
-
-    obstacles.forEach(obstacle => {
-        app.stage.addChild(obstacle.sprite);
-    });
+    // PHASE 4: Initialize Chunk Manager (procedural obstacles)
+    chunkManager = new ChunkManager(app);
+    console.log('[Game] ChunkManager initialized - obstacles will come from server');
 
     // Create debug text
     const debugStyle = new PIXI.TextStyle({
@@ -118,6 +117,13 @@ function initializeNetwork() {
 
     wsClient.onDisconnect = () => {
         console.log('[Game] Disconnected from server');
+    };
+
+    // PHASE 4: Handle incoming chunks
+    wsClient.onChunkReceived = (chunkData) => {
+        if (chunkManager) {
+            chunkManager.receiveChunk(chunkData);
+        }
     };
 
     // Connect to server
@@ -216,15 +222,18 @@ function update(deltaTime) {
         ghost.update(deltaTime);
     }
 
-    // Check obstacle collisions
+    // PHASE 4: Check collision with procedural obstacles from ChunkManager
     const playerBounds = player.getBounds();
-    for (let obstacle of obstacles) {
-        const obstacleBounds = obstacle.getBounds();
-        if (checkCollision(playerBounds, obstacleBounds)) {
-            // Player hit an obstacle - die!
-            player.die();
-            isGameRunning = false;
-            console.log('Game Over! Final Score:', score.toFixed(1));
+    if (chunkManager) {
+        const allObstacles = chunkManager.getAllObstacles();
+        for (let obstacleBounds of allObstacles) {
+            if (checkCollision(playerBounds, obstacleBounds)) {
+                // Player hit an obstacle - die!
+                player.die();
+                isGameRunning = false;
+                console.log('Game Over! Final Score:', score.toFixed(1));
+                break;
+            }
         }
     }
 
@@ -238,7 +247,8 @@ function update(deltaTime) {
 function render(deltaTime) {
     // Update debug info
     const fps = Math.round(1 / deltaTime);
-    debugText.text = `FPS: ${fps}\nPlayer: (${Math.round(player.x)}, ${Math.round(player.y)})\nGrounded: ${player.isGrounded}\nAlive: ${player.isAlive}\nGhosts: ${ghostPlayers.size}`;
+    const chunkCount = chunkManager ? chunkManager.getChunkCount() : 0;
+    debugText.text = `FPS: ${fps}\nPlayer: (${Math.round(player.x)}, ${Math.round(player.y)})\nGrounded: ${player.isGrounded}\nAlive: ${player.isAlive}\nGhosts: ${ghostPlayers.size}\nChunks: ${chunkCount}`;
 
     // Update score display
     scoreText.text = `Score: ${score.toFixed(1)}s`;

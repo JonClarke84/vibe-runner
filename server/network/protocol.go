@@ -82,7 +82,7 @@ func sanitizePlayerName(name string) string {
 //  4. Assigns player ID and sends welcome
 //  5. Enters message handling loop
 //  6. Removes player from game state and hub on disconnect
-func HandleClient(conn *websocket.Conn, gameState *game.GameState, clientHub *ClientHub) {
+func HandleClient(conn *websocket.Conn, gameState *game.GameState, clientHub *ClientHub, chunkManager game.ChunkManager) {
 	// Player ID will be assigned after join message
 	var playerID int
 	var playerName string
@@ -133,6 +133,17 @@ func HandleClient(conn *websocket.Conn, gameState *game.GameState, clientHub *Cl
 
 			// Register client with hub for state broadcasts
 			clientHub.AddClient(playerID, conn)
+
+			// PHASE 4: Send initial chunks to new player
+			if chunkManager != nil {
+				// Send chunks 0, 1, 2 (initial visible area)
+				for i := 0; i < 3; i++ {
+					chunk := chunkManager.GetOrGenerateChunkInterface(i)
+					if chunk != nil {
+						clientHub.BroadcastChunk(i, chunk)
+					}
+				}
+			}
 
 			log.Printf("Player joined: ID=%d, Name=%s, Position=(%.1f, %.1f), Active players: %d",
 				playerID, playerName, 100.0, 440.0, gameState.GetPlayerCount())

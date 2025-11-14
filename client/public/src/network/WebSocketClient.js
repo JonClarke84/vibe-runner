@@ -30,6 +30,7 @@ export class WebSocketClient {
         // Callbacks (set by main.js)
         this.onWelcome = null; // Called when welcome message received
         this.onStateUpdate = null; // Called when state message received
+        this.onChunkReceived = null; // Called when chunk message received (Phase 4)
         this.onDisconnect = null; // Called when connection closes
     }
 
@@ -182,7 +183,11 @@ export class WebSocketClient {
      */
     handleChunk(data) {
         console.log(`[WebSocket] Chunk ${data.id} received with ${data.obs.length} obstacles`);
-        // Will be implemented in later phases
+
+        // Notify main game (Phase 4)
+        if (this.onChunkReceived) {
+            this.onChunkReceived(data);
+        }
     }
 
     /**

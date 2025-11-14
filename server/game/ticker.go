@@ -11,6 +11,28 @@ type Broadcaster interface {
 	BroadcastState(gameState *GameState)
 }
 
+// ChunkBroadcaster is an interface for broadcasting chunk data to clients.
+// This extends Broadcaster to support procedural level generation in Phase 4.
+type ChunkBroadcaster interface {
+	Broadcaster
+	// BroadcastChunk sends a chunk to all connected clients
+	// The obstacles parameter uses the network.ObstacleData type
+	BroadcastChunk(chunkID int, obstacles interface{})
+}
+
+// ChunkManager is an interface for procedural chunk generation.
+// This prevents circular dependencies between game and generation packages.
+type ChunkManager interface {
+	// GenerateAheadForPlayer pre-generates chunks ahead of player position
+	GenerateAheadForPlayer(playerX float64, chunksAhead int)
+
+	// CleanupBehind removes chunks behind all players
+	CleanupBehind(minPlayerX float64, keepBehind int)
+
+	// GetOrGenerateChunkInterface retrieves or generates a chunk by ID
+	GetOrGenerateChunkInterface(chunkID int) interface{}
+}
+
 // Physics constants matching the Phase 1 client implementation.
 // These values determine how the game feels and must remain synchronized
 // with any client-side prediction in later phases.
@@ -43,7 +65,7 @@ const (
 
 // StartGameTicker launches the main game loop in a goroutine.
 // The game loop runs at 20Hz (50ms per tick) and updates all player physics,
-// then broadcasts the updated state to all clients.
+// manages chunk generation/broadcasting, then broadcasts the updated state to all clients.
 //
 // The ticker performs these operations each tick:
 //  1. Gets all active players from game state
@@ -51,18 +73,22 @@ const (
 //  3. Updates vertical velocity and position
 //  4. Checks for ground collision
 //  5. Updates grounded state
-//  6. Broadcasts state to all connected clients
+//  6. Generates chunks ahead of leading player
+//  7. Broadcasts new chunks to clients
+//  8. Cleans up old chunks behind all players
+//  9. Broadcasts state to all connected clients
 //
 // This function does not block. It launches a goroutine that runs indefinitely.
 // To stop the ticker, cancel the returned stop function (future enhancement).
 //
 // Parameters:
 //   - gameState: The shared game state containing all players
-//   - broadcaster: The broadcaster for sending state updates to clients
+//   - broadcaster: The broadcaster for sending state and chunk updates to clients
+//   - chunkManager: The chunk manager for procedural level generation (nil to disable)
 //
 // The function logs tick rate information on startup.
 // In production, consider adding a context parameter for graceful shutdown.
-func StartGameTicker(gameState *GameState, broadcaster Broadcaster) {
+func StartGameTicker(gameState *GameState, broadcaster Broadcaster, chunkManager ChunkManager) {
 	log.Printf("Game ticker starting at %d Hz (%.1f ms per tick)", TickRate, float64(TickDuration.Milliseconds()))
 
 	// Launch ticker in separate goroutine
@@ -72,6 +98,7 @@ func StartGameTicker(gameState *GameState, broadcaster Broadcaster) {
 		defer ticker.Stop()
 
 		tickCount := 0
+		lastBroadcastedChunk := -1
 
 		// Main game loop - runs indefinitely
 		for range ticker.C {
@@ -79,6 +106,13 @@ func StartGameTicker(gameState *GameState, broadcaster Broadcaster) {
 
 			// Get all active players
 			players := gameState.GetAllPlayers()
+
+			// Track player positions for chunk management
+			var maxPlayerX, minPlayerX float64
+			if len(players) > 0 {
+				maxPlayerX = players[0].X
+				minPlayerX = players[0].X
+			}
 
 			// Update physics for each player
 			for _, player := range players {
@@ -89,6 +123,44 @@ func StartGameTicker(gameState *GameState, broadcaster Broadcaster) {
 
 				// Apply physics update
 				updatePlayerPhysics(player)
+
+				// Track leading and trailing player positions
+				if player.X > maxPlayerX {
+					maxPlayerX = player.X
+				}
+				if player.X < minPlayerX {
+					minPlayerX = player.X
+				}
+			}
+
+			// Phase 4: Chunk management (if chunk manager provided)
+			if chunkManager != nil && len(players) > 0 {
+				// Generate chunks ahead of leading player
+				// Generate 2 chunks ahead (within 2 screen widths as per spec)
+				chunkManager.GenerateAheadForPlayer(maxPlayerX, 2)
+
+				// Broadcast new chunks to clients
+				// Determine which chunk the leading player is approaching
+				leadingChunkID := int(maxPlayerX / 5000.0)
+
+				// Broadcast next chunk if we haven't sent it yet
+				nextChunkID := leadingChunkID + 1
+				if nextChunkID > lastBroadcastedChunk {
+					chunk := chunkManager.GetOrGenerateChunkInterface(nextChunkID)
+					if chunk != nil && broadcaster != nil {
+						// Type assert to ChunkBroadcaster if supported
+						if chunkBroadcaster, ok := broadcaster.(ChunkBroadcaster); ok {
+							chunkBroadcaster.BroadcastChunk(nextChunkID, chunk)
+							lastBroadcastedChunk = nextChunkID
+						}
+					}
+				}
+
+				// Cleanup old chunks (every 4 seconds = 80 ticks)
+				if tickCount%80 == 0 {
+					// Keep 1 chunk behind trailing player for safety
+					chunkManager.CleanupBehind(minPlayerX, 1)
+				}
 			}
 
 			// Broadcast state to all clients at 20Hz

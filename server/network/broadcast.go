@@ -171,6 +171,104 @@ func (h *ClientHub) BroadcastState(gameState *game.GameState) {
 	}
 }
 
+// BroadcastChunk sends a level chunk to all connected clients.
+// This is called when a new chunk needs to be sent to players (typically
+// when the leading player approaches a new chunk boundary).
+//
+// Parameters:
+//   - chunkID: The ID of the chunk to broadcast
+//   - chunkData: The chunk data (interface{} to avoid circular dependency)
+//
+// The function creates a chunk message and sends it to all clients.
+// The chunkData is expected to be a *generation.Chunk but we use interface{}
+// to avoid import cycles.
+func (h *ClientHub) BroadcastChunk(chunkID int, chunkData interface{}) {
+	// Convert chunk data to network format
+	// We use reflection to extract obstacles without importing generation package
+	obstacles := convertChunkToObstacles(chunkData)
+	// Create chunk message
+	chunkMsg := Message{
+		E: "chunk",
+		D: ChunkMessage{
+			ID:  chunkID,
+			Obs: obstacles,
+		},
+	}
+
+	// Marshal to JSON once
+	messageBytes, err := json.Marshal(chunkMsg)
+	if err != nil {
+		log.Printf("Failed to marshal chunk message: %v", err)
+		return
+	}
+
+	// Broadcast to all clients
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for playerID, client := range h.clients {
+		// Non-blocking send
+		select {
+		case client.SendChan <- messageBytes:
+			// Message queued successfully
+		default:
+			// Channel full
+			log.Printf("Dropped chunk update for slow client: PlayerID=%d", playerID)
+		}
+	}
+
+	log.Printf("Broadcasted chunk %d with %d obstacles to %d clients", chunkID, len(obstacles), len(h.clients))
+}
+
+// convertChunkToObstacles converts a generation.Chunk to network ObstacleData format.
+// This uses reflection to avoid circular import between network and generation packages.
+//
+// Parameters:
+//   - chunkData: Expected to be *generation.Chunk
+//
+// Returns:
+//   - []ObstacleData: Converted obstacles for network transmission
+func convertChunkToObstacles(chunkData interface{}) []ObstacleData {
+	// Use type assertion with reflection to extract obstacles
+	// The chunk has structure: {ID int, Obstacles []Obstacle}
+	// Each Obstacle has: {Type int, X float64, Y float64}
+
+	// Type switch to handle the conversion
+	type chunkLike struct {
+		ID        int `json:"id"`
+		Obstacles []struct {
+			Type int     `json:"t"`
+			X    float64 `json:"x"`
+			Y    float64 `json:"y"`
+		} `json:"obs"`
+	}
+
+	// Try to marshal and unmarshal to extract data generically
+	jsonBytes, err := json.Marshal(chunkData)
+	if err != nil {
+		log.Printf("Failed to marshal chunk data: %v", err)
+		return []ObstacleData{}
+	}
+
+	var chunk chunkLike
+	if err := json.Unmarshal(jsonBytes, &chunk); err != nil {
+		log.Printf("Failed to unmarshal chunk data: %v", err)
+		return []ObstacleData{}
+	}
+
+	// Convert to network format
+	obstacles := make([]ObstacleData, len(chunk.Obstacles))
+	for i, obs := range chunk.Obstacles {
+		obstacles[i] = ObstacleData{
+			T: obs.Type,
+			X: obs.X,
+			Y: obs.Y,
+		}
+	}
+
+	return obstacles
+}
+
 // writeLoop handles writing messages to the WebSocket connection.
 // This runs in a dedicated goroutine per client.
 //

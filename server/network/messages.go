@@ -93,23 +93,27 @@ type DeathMessage struct {
 }
 
 // ChunkMessage delivers a procedurally generated level chunk to clients.
-// Sent when player approaches a new chunk boundary.
+// Sent when player approaches a new chunk boundary (within 2 screen widths).
 //
 // Example JSON:
-//   {"e": "chunk", "d": {"id": 10, "obs": [{"t": "spike", "x": 1000}]}}
+//   {"e": "chunk", "d": {"id": 10, "obs": [{"t": 1, "x": 15000, "y": 0}]}}
 type ChunkMessage struct {
 	// ID is the chunk identifier (sequential integer starting at 0).
+	// Chunk N covers X range [N*5000, (N+1)*5000)
 	ID int `json:"id"`
 
 	// Obs is the array of obstacles in this chunk.
-	Obs []Obstacle `json:"obs"`
+	Obs []ObstacleData `json:"obs"`
 }
 
-// Obstacle represents a single obstacle within a level chunk.
-type Obstacle struct {
-	// T is the obstacle type ("spike", "wall", "gap").
-	T string `json:"t"`
+// ObstacleData represents a single obstacle within a level chunk.
+type ObstacleData struct {
+	// T is the obstacle type (1=tall, 2=low, 3=spike).
+	T int `json:"t"`
 
-	// X is the horizontal position relative to chunk start (pixels).
+	// X is the absolute horizontal position in world coordinates (pixels).
 	X float64 `json:"x"`
+
+	// Y is the vertical position (0=ground level, positive=elevated).
+	Y float64 `json:"y"`
 }
