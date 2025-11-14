@@ -63,29 +63,42 @@ export class Player {
             return; // Don't update physics when dead
         }
 
-        // PHASE 2 CHUNK 7: Local physics disabled - server controls position
+        // PHASE 3: Client-side prediction enabled
         // Apply gravity
-        // this.velocityY += GRAVITY * deltaTime;
+        this.velocityY += GRAVITY * deltaTime;
 
         // Update position
-        // this.y += this.velocityY * deltaTime;
+        this.y += this.velocityY * deltaTime;
 
-        // Update sprite position (still needed for rendering)
+        // Update sprite position
         this.sprite.position.set(this.x, this.y);
     }
 
     /**
-     * Sets player position from server state.
+     * Sets player position from server state with reconciliation.
      * Called when receiving server state updates at 20Hz.
-     * This overrides any local prediction or physics.
+     * Implements client-side prediction with server correction.
      *
      * @param {number} x - Server-authoritative X position
      * @param {number} y - Server-authoritative Y position
      */
     setServerPosition(x, y) {
-        this.x = x;
-        this.y = y;
-        this.sprite.position.set(this.x, this.y);
+        // PHASE 3: Client-side prediction with reconciliation
+        // Calculate difference between predicted position and server state
+        const deltaX = Math.abs(this.x - x);
+        const deltaY = Math.abs(this.y - y);
+
+        // Tolerance threshold for reconciliation (pixels)
+        const RECONCILIATION_THRESHOLD = 5;
+
+        // If difference is significant, snap to server position
+        if (deltaX > RECONCILIATION_THRESHOLD || deltaY > RECONCILIATION_THRESHOLD) {
+            console.log(`[Player] Reconciling position. Client: (${this.x.toFixed(1)}, ${this.y.toFixed(1)}) Server: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+            this.x = x;
+            this.y = y;
+            this.sprite.position.set(this.x, this.y);
+        }
+        // Otherwise, trust client prediction (feels more responsive)
     }
 
     checkGroundCollision(groundY) {

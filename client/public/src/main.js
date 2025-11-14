@@ -5,6 +5,7 @@ import { Ground } from './game/Ground.js';
 import { Obstacle } from './game/Obstacle.js';
 import { checkCollision } from './game/collision.js';
 import { WebSocketClient } from './network/WebSocketClient.js';
+import { GhostPlayer } from './game/GhostPlayer.js';
 
 // Game constants
 const GAME_WIDTH = 1280;
@@ -21,6 +22,10 @@ let lastTime = 0;
 
 // Network
 let wsClient = null;
+let myPlayerId = null; // Our player ID from server
+
+// Ghost players (other connected players)
+let ghostPlayers = new Map(); // Map<playerId, GhostPlayer>
 
 // Debug display
 let debugText;
@@ -98,15 +103,17 @@ function initializeNetwork() {
     // Set up callbacks
     wsClient.onWelcome = (playerId, seed, serverTime) => {
         console.log(`[Game] Welcome! Player ID: ${playerId}, Seed: ${seed}`);
-        // Will be used in Chunk 7
+        myPlayerId = playerId; // Store our player ID
     };
 
     wsClient.onStateUpdate = (x, y, allPlayers) => {
         // Update local player position from server state
         player.setServerPosition(x, y);
 
-        // TODO: In Phase 3, render other players (ghost players)
-        // For now, we only update our own player
+        // PHASE 3: Render ghost players (other connected players)
+        if (allPlayers && allPlayers.length > 0) {
+            updateGhostPlayers(allPlayers);
+        }
     };
 
     wsClient.onDisconnect = () => {
@@ -118,13 +125,58 @@ function initializeNetwork() {
     console.log('[Game] Connecting to server...');
 }
 
+// Update ghost players from server state
+function updateGhostPlayers(allPlayers) {
+    // Track which player IDs are in the current state
+    const currentPlayerIds = new Set();
+
+    // Update or create ghost players
+    for (const playerData of allPlayers) {
+        const playerId = playerData.i; // Player ID
+        const x = playerData.x;
+        const y = playerData.y;
+
+        // Skip our own player
+        if (playerId === myPlayerId) {
+            continue;
+        }
+
+        currentPlayerIds.add(playerId);
+
+        // Create new ghost if it doesn't exist
+        if (!ghostPlayers.has(playerId)) {
+            const ghost = new GhostPlayer(playerId, `Player${playerId}`);
+            ghost.setTargetPosition(x, y);
+            ghost.x = x; // Initialize position immediately
+            ghost.y = y;
+            ghostPlayers.set(playerId, ghost);
+            app.stage.addChild(ghost.getContainer());
+            console.log(`[Game] New ghost player joined: ${playerId}`);
+        } else {
+            // Update existing ghost's target position
+            const ghost = ghostPlayers.get(playerId);
+            ghost.setTargetPosition(x, y);
+        }
+    }
+
+    // Remove ghosts for disconnected players
+    for (const [playerId, ghost] of ghostPlayers.entries()) {
+        if (!currentPlayerIds.has(playerId)) {
+            console.log(`[Game] Ghost player left: ${playerId}`);
+            ghost.destroy();
+            ghostPlayers.delete(playerId);
+        }
+    }
+}
+
 // Input handling
 function setupInput() {
     window.addEventListener('keydown', (event) => {
         if (event.code === 'Space') {
-            // PHASE 2 CHUNK 8: Send jump to server (server-authoritative)
-            // player.jump(); // Local jump disabled
+            // PHASE 3: Client-side prediction - jump immediately
+            player.jump(); // Apply jump locally for instant feedback
 
+            // Also notify server for validation
             if (wsClient && wsClient.isConnected) {
                 wsClient.sendJump();
             }
@@ -159,6 +211,11 @@ function update(deltaTime) {
     // Check ground collision
     player.checkGroundCollision(ground.getY());
 
+    // PHASE 3: Update ghost players (entity interpolation)
+    for (const ghost of ghostPlayers.values()) {
+        ghost.update(deltaTime);
+    }
+
     // Check obstacle collisions
     const playerBounds = player.getBounds();
     for (let obstacle of obstacles) {
@@ -181,7 +238,7 @@ function update(deltaTime) {
 function render(deltaTime) {
     // Update debug info
     const fps = Math.round(1 / deltaTime);
-    debugText.text = `FPS: ${fps}\nPlayer: (${Math.round(player.x)}, ${Math.round(player.y)})\nGrounded: ${player.isGrounded}\nAlive: ${player.isAlive}`;
+    debugText.text = `FPS: ${fps}\nPlayer: (${Math.round(player.x)}, ${Math.round(player.y)})\nGrounded: ${player.isGrounded}\nAlive: ${player.isAlive}\nGhosts: ${ghostPlayers.size}`;
 
     // Update score display
     scoreText.text = `Score: ${score.toFixed(1)}s`;
