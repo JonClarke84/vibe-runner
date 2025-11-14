@@ -16,8 +16,9 @@ This section defines the complete visual identity. The goal is a **"Hyper-Synthw
 
 * **Base:** Deep Indigo (`#1a1a2e`), Dark Purple (`#301a4b`), Near-Black.
 * **Primary Neon:** Electric Pink (`#ff007f`), Hyper-Cyan (`#00f0ff`).
-* **Secondary Neon:** Solar Orange (`#ff8c00`), Phosphor Green (`#33ff00` \- UI only).
+* **Secondary Neon:** Magenta (`#ff00ff`), Violet Glow (`#b388ff`), Solar Orange (`#ff8c00` \- collectibles only).
 * **Obstacle Color:** Glitch Red (`#ff003c`).
+* **UI Text:** Hyper-Cyan (`#00f0ff`) for primary text, Electric Pink (`#ff007f`) for headers, Magenta (`#ff00ff`) for emphasis, Violet Glow (`#b388ff`) for secondary text.
 
 ## 3.3. Characters
 
@@ -55,9 +56,14 @@ The background is high-resolution and uses aggressive **parallax scrolling** to 
 
 * **Style:** "80s Computer Terminal."
 * **Reference:** The UI from *Alien: Isolation* or *Fallout*'s terminals.
-* **Font:** A glowing, monospaced pixel font (like "VT323" or "Press Start 2P" from Google Fonts). All text is `Phosphor Green`.
+* **Font:** A glowing, monospaced pixel font (like "VT323" or "Press Start 2P" from Google Fonts).
+* **Text Colors:**
+  * Primary UI text: `Hyper-Cyan` (`#00f0ff`)
+  * Headers/Titles: `Electric Pink` (`#ff007f`)
+  * Emphasis/Values: `Magenta` (`#ff00ff`)
+  * Secondary text: `Violet Glow` (`#b388ff`)
 * **Containers:** All UI elements (leaderboard, score) are in dark, 70% transparent black boxes with sharp, 1px `Hyper-Cyan` borders.
 * **Effects:** The entire UI (and optionally the whole screen) has a very subtle, gently flickering **scan line** overlay shader.
 * **Fun Detail:**
-  * **Main Menu:** Shows `[SYSTEM BOOTING...]` and `[ACCESSING VIBE_GRID...]`.
-  * **Death Screen:** Instead of "Game Over," it displays a fake system crash: `FATAL ERROR: 0xDEADBEEF` `PLAYER_PROCESS_TERMINATED` `[Press 'R' to REBOOT]`
+  * **Main Menu:** Shows `[SYSTEM BOOTING...]` and `[ACCESSING VIBE_GRID...]` in Hyper-Cyan.
+  * **Death Screen:** Instead of "Game Over," it displays a fake system crash in Glitch Red: `FATAL ERROR: 0xDEADBEEF` `PLAYER_PROCESS_TERMINATED` with `[Press 'R' to REBOOT]` in Hyper-Cyan.
