@@ -1,0 +1,21 @@
+{
+  "name": "vibe-runner-client",
+  "version": "0.1.0",
+  "description": "Vibe Runner - Phase 1: Core Local Game",
+  "type": "module",
+  "scripts": {
+    "dev": "npx http-server public -p 3000 -c-1 --cors -o",
+    "start": "npm run dev"
+  },
+  "keywords": [
+    "game",
+    "pixijs",
+    "infinite-runner",
+    "synthwave"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
