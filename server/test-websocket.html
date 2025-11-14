@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test - Vibe Runner</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #00f0ff;
+        }
+        h1 {
+            color: #ff007f;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            border: 2px solid #00f0ff;
+            min-height: 300px;
+            margin-top: 20px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+        .log-connected {
+            color: #33ff00;
+        }
+        .log-sent {
+            color: #ff007f;
+        }
+        .log-received {
+            color: #00f0ff;
+        }
+        .log-error {
+            color: #ff003c;
+        }
+        button {
+            background: #ff007f;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #00f0ff;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test - Phase 2 Chunk 1</h1>
+    <p>Testing WebSocket connection to ws://localhost:8080/ws</p>
+
+    <div>
+        <button onclick="connect()">Connect</button>
+        <button onclick="sendTestMessage()">Send Test Message</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected!', 'error');
+                return;
+            }
+
+            log('Connecting to ws://localhost:8080/ws...', 'info');
+
+            ws = new WebSocket('ws://localhost:8080/ws');
+
+            ws.onopen = () => {
+                log('✅ Connected to server!', 'connected');
+            };
+
+            ws.onmessage = (event) => {
+                log(`📨 Received: ${event.data}`, 'received');
+            };
+
+            ws.onerror = (error) => {
+                log(`❌ WebSocket error: ${error}`, 'error');
+            };
+
+            ws.onclose = () => {
+                log('🔌 Connection closed', 'info');
+                ws = null;
+            };
+        }
+
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected! Click Connect first.', 'error');
+                return;
+            }
+
+            const testMessage = 'Hello from browser!';
+            ws.send(testMessage);
+            log(`📤 Sent: ${testMessage}`, 'sent');
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                log('Disconnecting...', 'info');
+            } else {
+                log('Not connected!', 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect on page load for convenience
+        window.addEventListener('load', () => {
+            log('Test page loaded. Click "Connect" to start.', 'info');
+        });
+    </script>
+</body>
+</html>

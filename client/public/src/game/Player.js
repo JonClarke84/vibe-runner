@@ -63,13 +63,28 @@ export class Player {
             return; // Don't update physics when dead
         }
 
+        // PHASE 2 CHUNK 7: Local physics disabled - server controls position
         // Apply gravity
-        this.velocityY += GRAVITY * deltaTime;
+        // this.velocityY += GRAVITY * deltaTime;
 
         // Update position
-        this.y += this.velocityY * deltaTime;
+        // this.y += this.velocityY * deltaTime;
 
-        // Update sprite position
+        // Update sprite position (still needed for rendering)
+        this.sprite.position.set(this.x, this.y);
+    }
+
+    /**
+     * Sets player position from server state.
+     * Called when receiving server state updates at 20Hz.
+     * This overrides any local prediction or physics.
+     *
+     * @param {number} x - Server-authoritative X position
+     * @param {number} y - Server-authoritative Y position
+     */
+    setServerPosition(x, y) {
+        this.x = x;
+        this.y = y;
         this.sprite.position.set(this.x, this.y);
     }
 

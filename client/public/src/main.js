@@ -4,6 +4,7 @@ import { Player } from './game/Player.js';
 import { Ground } from './game/Ground.js';
 import { Obstacle } from './game/Obstacle.js';
 import { checkCollision } from './game/collision.js';
+import { WebSocketClient } from './network/WebSocketClient.js';
 
 // Game constants
 const GAME_WIDTH = 1280;
@@ -17,6 +18,9 @@ let obstacles = [];
 let isGameRunning = true;
 let score = 0;
 let lastTime = 0;
+
+// Network
+let wsClient = null;
 
 // Debug display
 let debugText;
@@ -79,15 +83,51 @@ function init() {
     // Set up input
     setupInput();
 
+    // Initialize WebSocket connection
+    initializeNetwork();
+
     // Start game loop
     requestAnimationFrame(gameLoop);
+}
+
+// Initialize network connection
+function initializeNetwork() {
+    // Create WebSocket client
+    wsClient = new WebSocketClient('Player1'); // Default name for now
+
+    // Set up callbacks
+    wsClient.onWelcome = (playerId, seed, serverTime) => {
+        console.log(`[Game] Welcome! Player ID: ${playerId}, Seed: ${seed}`);
+        // Will be used in Chunk 7
+    };
+
+    wsClient.onStateUpdate = (x, y, allPlayers) => {
+        // Update local player position from server state
+        player.setServerPosition(x, y);
+
+        // TODO: In Phase 3, render other players (ghost players)
+        // For now, we only update our own player
+    };
+
+    wsClient.onDisconnect = () => {
+        console.log('[Game] Disconnected from server');
+    };
+
+    // Connect to server
+    wsClient.connect();
+    console.log('[Game] Connecting to server...');
 }
 
 // Input handling
 function setupInput() {
     window.addEventListener('keydown', (event) => {
         if (event.code === 'Space') {
-            player.jump();
+            // PHASE 2 CHUNK 8: Send jump to server (server-authoritative)
+            // player.jump(); // Local jump disabled
+
+            if (wsClient && wsClient.isConnected) {
+                wsClient.sendJump();
+            }
         }
     });
 }
