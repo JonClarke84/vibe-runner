@@ -61,6 +61,10 @@ const (
 	// DeltaTime is the time step for physics calculations (seconds)
 	// This is 0.05 seconds (50ms) for 20Hz
 	DeltaTime = 1.0 / float64(TickRate)
+
+	// PlayerSpeed is the constant horizontal movement speed (pixels/second)
+	// Phase 5: Players automatically move right at this speed
+	PlayerSpeed = 300.0
 )
 
 // StartGameTicker launches the main game loop in a goroutine.
@@ -217,7 +221,6 @@ func updatePlayerPhysics(player *Player) {
 	}
 
 	// Horizontal movement (constant speed, no acceleration)
-	// Players move right at fixed speed
-	// TODO: Implement in Chunk 4 or later - for now, players stay at spawn X=100
-	// player.X += PlayerSpeed * DeltaTime
+	// Players move right at fixed speed (Phase 5)
+	player.X += PlayerSpeed * DeltaTime
 }

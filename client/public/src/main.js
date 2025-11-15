@@ -222,20 +222,23 @@ function update(deltaTime) {
         ghost.update(deltaTime);
     }
 
-    // PHASE 4: Check collision with procedural obstacles from ChunkManager
-    const playerBounds = player.getBounds();
-    if (chunkManager) {
-        const allObstacles = chunkManager.getAllObstacles();
-        for (let obstacleBounds of allObstacles) {
-            if (checkCollision(playerBounds, obstacleBounds)) {
-                // Player hit an obstacle - die!
-                player.die();
-                isGameRunning = false;
-                console.log('Game Over! Final Score:', score.toFixed(1));
-                break;
-            }
-        }
-    }
+    // PHASE 5: Camera follows player horizontally
+    // Center camera on player (player at 1/3 from left edge for better forward visibility)
+    const cameraX = -(player.x - GAME_WIDTH / 3);
+    app.stage.x = cameraX;
+
+    // TODO PHASE 5: Re-enable collision detection with server validation
+    // const playerBounds = player.getBounds();
+    // if (chunkManager) {
+    //     const allObstacles = chunkManager.getAllObstacles();
+    //     for (let obstacleBounds of allObstacles) {
+    //         if (checkCollision(playerBounds, obstacleBounds)) {
+    //             player.die();
+    //             isGameRunning = false;
+    //             break;
+    //         }
+    //     }
+    // }
 
     // Update score (time survived)
     if (player.isAlive) {
@@ -300,6 +303,21 @@ function showDeathScreen() {
 
 // Restart game
 function restartGame() {
+    console.log('[Game] Restarting game...');
+
+    // CRITICAL: Disconnect old WebSocket to prevent connection storm
+    if (wsClient && wsClient.isConnected) {
+        console.log('[Game] Disconnecting old WebSocket...');
+        wsClient.disconnect();
+        wsClient = null;
+    }
+
+    // Clear all ghost players
+    for (const ghost of ghostPlayers.values()) {
+        ghost.destroy();
+    }
+    ghostPlayers.clear();
+
     // Clear stage
     app.stage.removeChildren();
 
@@ -307,9 +325,12 @@ function restartGame() {
     obstacles = [];
     isGameRunning = true;
     score = 0;
+    myPlayerId = null;
 
-    // Reinitialize
+    // Reinitialize (this will create a new WebSocket connection)
     init();
+
+    console.log('[Game] Restart complete');
 }
 
 // Start the game
